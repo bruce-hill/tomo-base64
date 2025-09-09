@@ -5,26 +5,11 @@ _enc := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".bytes
 _urlenc := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".bytes()
 
 _EQUAL_BYTE := Byte(0x3D)
-_INVALID := Byte(255)
 
-_dec : [Byte] = [
-    _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, _INVALID, _INVALID, 62,  _INVALID, 62, _INVALID, 63,
-    52,  53,  54,  55,  56,  57,  58,  59,
-    60,  61,  _INVALID, _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-    _INVALID, 0,   1,   2,   3,   4,   5,   6,
-    7,   8,   9,   10,  11,  12,  13,  14,
-    15,  16,  17,  18,  19,  20,  21,  22,
-    23,  24,  25,  _INVALID, _INVALID, _INVALID, _INVALID, 63,
-    _INVALID, 26,  27,  28,  29,  30,  31,  32,
-    33,  34,  35,  36,  37,  38,  39,  40,
-    41,  42,  43,  44,  45,  46,  47,  48,
-    49,  50,  51,  _INVALID, _INVALID, _INVALID, _INVALID, _INVALID,
-]
+_decode : {Byte=Byte} = {
+    b=Byte(i-1) for i,b in _enc,
+    b=Byte(i-1) for i,b in _urlenc,
+}
 
 lang Base64
     func encode_text(text:Text, url=no -> Base64)
@@ -81,26 +66,20 @@ lang Base64
             b3 := bytes[src+2]
             b4 := bytes[src+3]
 
-            x1 := _dec[1+b1]
-            x2 := _dec[1+b2]
-            x3 := _dec[1+b3]
-            x4 := _dec[1+b4]
-
             src += 4
 
             if is_last_chunk and b4 == _EQUAL_BYTE
-                if x1 == _INVALID or x2 == _INVALID
-                    return none
-
+                x1 := _decode[b1] or return none
+                x2 := _decode[b2] or return none
                 output.insert((x1 << 2) or (x2 >> 4))
                 if b3 != _EQUAL_BYTE and b4 == _EQUAL_BYTE
-                    if x3 == _INVALID
-                        return none
+                    x3 := _decode[b3] or return none
                     output.insert((x2 << 4) or (x3 >> 2))
             else
-                if x1 == _INVALID or x2 == _INVALID or x3 == _INVALID or x4 == _INVALID
-                    return none
-
+                x1 := _decode[b1] or return none
+                x2 := _decode[b2] or return none
+                x3 := _decode[b3] or return none
+                x4 := _decode[b4] or return none
                 output.insert((x1 << 2) or (x2 >> 4))
                 output.insert(((x2 and 0b1111) << 4) or (x3 >> 2))
                 output.insert(((x3 and 0b11) << 6) or x4)
@@ -110,24 +89,18 @@ lang Base64
 
 func _test()
     for test in ["", "A", "AB", "ABC", "ABCD", "ABCDE", "ABCDEF", "ABCDEFG", "ABCDEFGH", "ABCDEFGHI"]
-        >> b64 := Base64.encode_text(test)
-        >> b64.decode_bytes()
-        >> b64.decode_text()
+        b64 := Base64.encode_text(test)
         assert b64.decode_text() == test
 
     for test in [[Byte(0xFF)], [Byte(0xFF), 0xFE]]
-        say("")
-        >> test
-        >> b64 := Base64.encode_bytes(test)
-        >> b64.decode_bytes()
+        b64 := Base64.encode_bytes(test)
         assert b64.decode_bytes() == test
 
-        >> b64url := Base64.encode_bytes(test, url=yes)
-        >> b64url.decode_bytes()
+        b64url := Base64.encode_bytes(test, url=yes)
         assert b64url.decode_bytes() == test
 
     for len in 10
-        >> bytes := [random.byte() for _ in len]
+        bytes := [random.byte() for _ in len]
         assert Base64.encode_bytes(bytes).decode_bytes() == bytes
 
 func main(input|i=(/dev/stdin), output|o=(/dev/stdout), url=no, decode=no, test=no)
